@@ -185,28 +185,43 @@ def add_text_to_image(image_path, text, output_path):
     image = Image.open(image_path)
 
     # Create a drawing object
-    draw = ImageDraw.Draw(image)
+    draw = ImageDraw.Draw(image, 'RGBA')
 
     # Define font properties (adjust the path to your desired font and its size)
     font_path = "font/Helvetica.ttf"
     font_size = 30
     font = ImageFont.truetype(font_path, font_size)
 
+    # Set the margins
+    margin_x = 20
+    margin_y = 20
+
     # Wrap the text
-    # Adjust this value to control the text width
-    max_width = int(image.width * 0.8)
-    lines = textwrap.wrap(text, width=max_width)
+    max_width = image.width - (2 * margin_x)
+    avg_char_width = font.getlength("a")
+    chars_per_line = max_width // avg_char_width
+    lines = textwrap.wrap(text, width=chars_per_line)
 
     # Calculate the initial text position (vertically centered)
     total_text_height = len(lines) * font_size
     y = (image.height - total_text_height) // 2
 
+    # Define line spacing
+    line_spacing = 5
+
     # Draw the wrapped text on the image
     for line in lines:
-        text_width, text_height = draw.textsize(line, font)
-        x = (image.width - text_width) // 2
-        draw.text((x, y), line, font=font, fill=(255, 255, 255))
-        y += text_height
+        text_width = draw.textlength(line, font)
+        x = margin_x + (max_width - text_width) // 2
+
+        # Draw the translucent white rectangle behind the text
+        rectangle_fill = (255, 255, 255, 150)  # RGBA: white with 150/255 alpha
+        draw.rectangle([x-5, y, x + text_width + 5, y +
+                       font_size], fill=rectangle_fill)
+
+        # Draw the text
+        draw.text((x, y), line, font=font, fill=(0, 0, 0))  # Black text
+        y += font_size + line_spacing  # Increase y with line_spacing
 
     # Save the new image
     image.save(output_path)

@@ -1,0 +1,9 @@
+pandas
+numpy
+tweepy
+json
+openai
+dalle-pytorch
+Cython
+stability-sdk
+Pillow
