@@ -1,8 +1,36 @@
+# Stability API related imports
+import textwrap
+from PIL import Image, ImageDraw, ImageFont
+import stability_sdk.interfaces.gooseai.generation.generation_pb2 as generation
+from stability_sdk import client
+
+# Image related imports
+from IPython.display import display
+import io
+from PIL import Image
+
+# DALL-E related imports
+from dalle_pytorch import OpenAIDiscreteVAE, DALLE
+
+# JSON and data related imports
 import json
-import tweepy
-import os
 from pandas import json_normalize
+import pandas as pd
 import re
+
+# Twitter related imports
+import tweepy
+
+# OpenAI related imports
+import openai
+
+# Other miscellaneous imports
+import warnings
+import getpass
+import os
+import base64
+import requests
+
 
 # Define the path to the file containing API keys and descriptions
 api_key_file = os.path.join('config', 'api_keys.txt')
@@ -18,19 +46,12 @@ for line in api_key_lines:
         key_description, api_key = line.split()
         api_keys[key_description.strip('[]')] = api_key
 
-# Print the API keys
-api_keys['twitter_api_key']
-api_keys['twitter_api_secret']
-api_keys['twitter_bearer_token']
-api_keys['twitter_access_token']
-api_keys['twitter_access_token_secret']
-
-
-# Replace these with your own Twitter API credentials
+# API Keys
 consumer_key = api_keys['twitter_api_key']
 consumer_secret = api_keys['twitter_api_secret']
 access_token = api_keys['twitter_access_token']
 access_token_secret = api_keys['twitter_access_token_secret']
+openai.api_key = api_keys['openai']
 
 # Authenticate to the Twitter API
 auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
@@ -64,10 +85,16 @@ def fetch_news(news_source):
         engagement_score, axis=1)
     tweet_data_df = tweet_data_df.sort_values(
         by='engagement_score', ascending=False).reset_index(drop=True)
-    tweet_text = '|'.join(tweet_data_df['text'][0:3])
-    tweet_text = re.sub(r'https://t.co/\w+', '', tweet_text)
 
-    return tweet_text
+    # clean hyperlink text
+    tweet_data_df['text'] = tweet_data_df['text'].apply(clean_hyperlinks)
+    tweet_data_df.to_csv('data/tweet_data.csv', index=False)
+
+# Clean the hyperlinks from the tweet text
+
+
+def clean_hyperlinks(tweet):
+    return re.sub(r'https://t.co/\w+', '', tweet)
 
 
 # Calculate the engagement score of a tweet
@@ -81,3 +108,113 @@ def engagement_score(tweet):
 
 
 fetch_news('BBCWorld')
+
+
+# Function to get Bible verse and keywords using GPT-3.5
+
+
+def get_bible_verse_and_keywords(news):
+    prompt = f"Given the following news: '{news}' - Provide a relevant bible verse that might provide reassurance, encouragement, motivation, inspiration, guidance, comfort, spiritual growth or wisdom. First provide context for the event, then present the verse, and then highlight how the verse relates to it. Example: In the wake of the recent tragedy in the French Alps, we turn to Psalm 46:1 for comfort and reassurance: 'God is our refuge and strength, an ever-present help in trouble."
+
+    response = openai.Completion.create(
+        engine="text-davinci-002",
+        prompt=prompt,
+        max_tokens=150,
+        n=1,
+        stop=None,
+        temperature=0.5,
+    )
+
+    return response.choices[0].text.strip()
+
+
+# Read in top tweets to create verse
+top_tweets = pd.read_csv('data/tweet_data.csv')
+
+twt = top_tweets['text'][1]
+get_bible_verse_and_keywords(twt)
+
+
+api_keys['dream_studio']
+
+
+engine_id = "stable-diffusion-v1-5"
+api_host = os.getenv('API_HOST', 'https://api.stability.ai')
+api_key = api_keys['dream_studio']
+
+if api_key is None:
+    raise Exception("Missing Stability API key.")
+
+response = requests.post(
+    f"{api_host}/v1/generation/{engine_id}/text-to-image",
+    headers={
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    },
+    json={
+        "text_prompts": [
+            {
+                "text": "A lighthouse on a cliff"
+            }
+        ],
+        "cfg_scale": 7,
+        "clip_guidance_preset": "FAST_BLUE",
+        "height": 512,
+        "width": 512,
+        "samples": 1,
+        "steps": 10,
+    },
+)
+
+if response.status_code != 200:
+    raise Exception("Non-200 response: " + str(response.text))
+
+data = response.json()
+
+for i, image in enumerate(data["artifacts"]):
+    with open(f"./out/v1_txt2img_{i}.png", "wb") as f:
+        f.write(base64.b64decode(image["base64"]))
+
+
+# ----- Image Editing -----
+
+
+def add_text_to_image(image_path, text, output_path):
+    # Load the image
+    image = Image.open(image_path)
+
+    # Create a drawing object
+    draw = ImageDraw.Draw(image)
+
+    # Define font properties (adjust the path to your desired font and its size)
+    font_path = "font/Helvetica.ttf"
+    font_size = 30
+    font = ImageFont.truetype(font_path, font_size)
+
+    # Wrap the text
+    # Adjust this value to control the text width
+    max_width = int(image.width * 0.8)
+    lines = textwrap.wrap(text, width=max_width)
+
+    # Calculate the initial text position (vertically centered)
+    total_text_height = len(lines) * font_size
+    y = (image.height - total_text_height) // 2
+
+    # Draw the wrapped text on the image
+    for line in lines:
+        text_width, text_height = draw.textsize(line, font)
+        x = (image.width - text_width) // 2
+        draw.text((x, y), line, font=font, fill=(255, 255, 255))
+        y += text_height
+
+    # Save the new image
+    image.save(output_path)
+
+
+# Example usage
+image_path = "out/your_image.png"
+bible_verse = "John 3:16 - For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life."
+output_path = "out/your_image_with_text.png"
+
+add_text_to_image(image_path, bible_verse, output_path)
