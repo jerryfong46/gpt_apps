@@ -52,6 +52,8 @@ consumer_secret = api_keys['twitter_api_secret']
 access_token = api_keys['twitter_access_token']
 access_token_secret = api_keys['twitter_access_token_secret']
 openai.api_key = api_keys['openai']
+insta_token = api_keys['graph_api_access_token']
+
 
 # Authenticate to the Twitter API
 auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
@@ -233,3 +235,41 @@ bible_verse = "John 3:16 - For God so loved the world, that he gave his only beg
 output_path = "out/your_image_with_text.png"
 
 add_text_to_image(image_path, bible_verse, output_path)
+
+
+# ---- Post on Instagram ----
+
+def publish_image():
+    access_token = insta_token
+    ig_user_id = '17841458791296115'
+    image_url = 'https://i.swncdn.com/media/1600w/cms/BST/45821-inspirational%20verses.800w.tn.webp'
+
+    post_url = 'https://graph.facebook.com/v16.0/{}/media'.format(ig_user_id)
+    payload = {
+        'image_url': image_url,
+        'caption': 'This is a test caption',
+        'access_token': access_token
+    }
+
+    r = requests.post(post_url, data=payload)
+    print(r.text)
+    print('Media uploaded sucessfully')
+
+    results = json.loads(r.text)
+    if 'id' in results:
+        creation_id = results['id']
+        second_url = 'https://graph.facebook.com/v16.0/{}/media_publish'.format(
+            ig_user_id)
+        second_payload = {
+            'creation_id': creation_id,
+            'access_token': access_token
+        }
+
+        r = requests.post(second_url, data=second_payload)
+        print(r.text)
+        print('Media published to instagram')
+    else:
+        print('Media not published to instagram')
+
+
+publish_image()
