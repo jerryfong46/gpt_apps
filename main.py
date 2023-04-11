@@ -1,4 +1,7 @@
+# ---- Import Required Packages ----
+
 # Stability API related imports
+from imgurpython import ImgurClient
 import textwrap
 from PIL import Image, ImageDraw, ImageFont
 import stability_sdk.interfaces.gooseai.generation.generation_pb2 as generation
@@ -31,7 +34,6 @@ import os
 import base64
 import requests
 
-
 # Define the path to the file containing API keys and descriptions
 api_key_file = os.path.join('config', 'api_keys.txt')
 
@@ -53,7 +55,8 @@ access_token = api_keys['twitter_access_token']
 access_token_secret = api_keys['twitter_access_token_secret']
 openai.api_key = api_keys['openai']
 insta_token = api_keys['graph_api_access_token']
-
+imgur_client_id = api_keys['imgur_client_id']
+ig_user_id = api_keys['ig_user_id']
 
 # Authenticate to the Twitter API
 auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
@@ -68,7 +71,7 @@ def fetch_news(news_source):
 
     # Fetch the 5 most recent tweets from the news source
     tweets = api.user_timeline(
-        screen_name=news_source, count=5, tweet_mode="extended")
+        screen_name=news_source, count=100, tweet_mode="extended")
 
     # Extract relevant information from the tweets
     tweet_data = []
@@ -100,28 +103,25 @@ def clean_hyperlinks(tweet):
 
 
 # Calculate the engagement score of a tweet
-
-
 def engagement_score(tweet):
     retweets_weight = 5
     likes_weight = 1
-
     return (tweet["retweets"] * retweets_weight + tweet["likes"] * likes_weight)
 
 
+# Download and sort top tweets over past 24 hours
 fetch_news('BBCWorld')
-
 
 # Function to get Bible verse and keywords using GPT-3.5
 
 
 def get_bible_verse_and_keywords(news):
-    prompt = f"Given the following news: '{news}' - Provide a relevant bible verse that might provide reassurance, encouragement, motivation, inspiration, guidance, comfort, spiritual growth or wisdom. First provide context for the event, then present the verse, and then highlight how the verse relates to it. Example: In the wake of the recent tragedy in the French Alps, we turn to Psalm 46:1 for comfort and reassurance: 'God is our refuge and strength, an ever-present help in trouble."
+    prompt = f"Given the following news: '{news}' - provide a relevant bible verse that might provide encouragement or comfort or guidance. Present the verse, then provide context about how the event relates to the verse"
 
     response = openai.Completion.create(
         engine="text-davinci-002",
         prompt=prompt,
-        max_tokens=150,
+        max_tokens=200,
         n=1,
         stop=None,
         temperature=0.5,
@@ -130,53 +130,93 @@ def get_bible_verse_and_keywords(news):
     return response.choices[0].text.strip()
 
 
+def get_verse_from_gpt_response(gpt_response):
+    # Regex pattern to match the Bible verse in the text
+    pattern_book = r'(\b[A-Za-z]+\s\d+:\d+\b)'
+    match_book = re.findall(pattern_book, gpt_response)
+    pattern_verse = r'"(.*?)”'
+    match_verse = re.findall(pattern_verse, gpt_response)
+
+    final_verse = match_verse[0] + ' - ' + match_book[0]
+
+    return final_verse
+
+
+get_verse_from_gpt_response(gpt_response)
+
+
 # Read in top tweets to create verse
 top_tweets = pd.read_csv('data/tweet_data.csv')
 
-twt = top_tweets['text'][1]
-get_bible_verse_and_keywords(twt)
+# Use tweet as prompt to generate Bible verse and caption
+twt = top_tweets['text'][1]  # Get top tweet
+gpt_response = get_bible_verse_and_keywords(twt)  # Get GPT response
+bible_verse = get_verse_from_gpt_response(
+    gpt_response)  # Get verse from GPT response
+
+verse_prompt = get_image_prompt_from_verse(
+    bible_verse)  # Get image prompt from verse
+gen_image_from_text(verse_prompt)  # Generate image from text
 
 
-api_keys['dream_studio']
+def get_image_prompt_from_verse(verse):
+    prompt = f"Given the following bible verse: '{verse}' - provide a prompt to generate an scenic image of nature to depict the verse"
+
+    response = openai.Completion.create(
+        engine="text-davinci-002",
+        prompt=prompt,
+        max_tokens=200,
+        n=1,
+        stop=None,
+        temperature=0.5,
+    )
+
+    return response.choices[0].text.strip()
+
+# Function to generate image from text and save to local directory
 
 
-engine_id = "stable-diffusion-v1-5"
-api_host = os.getenv('API_HOST', 'https://api.stability.ai')
-api_key = api_keys['dream_studio']
+def gen_image_from_text(verse_prompt):
 
-if api_key is None:
-    raise Exception("Missing Stability API key.")
+    # Function to get Bible verse and keywords using GPT-3.5
+    engine_id = "stable-diffusion-v1-5"
+    api_host = os.getenv('API_HOST', 'https://api.stability.ai')
+    api_key = api_keys['dream_studio']
 
-response = requests.post(
-    f"{api_host}/v1/generation/{engine_id}/text-to-image",
-    headers={
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "Authorization": f"Bearer {api_key}"
-    },
-    json={
-        "text_prompts": [
-            {
-                "text": "A lighthouse on a cliff"
-            }
-        ],
-        "cfg_scale": 7,
-        "clip_guidance_preset": "FAST_BLUE",
-        "height": 512,
-        "width": 512,
-        "samples": 1,
-        "steps": 10,
-    },
-)
+    if api_key is None:
+        raise Exception("Missing Stability API key.")
 
-if response.status_code != 200:
-    raise Exception("Non-200 response: " + str(response.text))
+    response = requests.post(
+        f"{api_host}/v1/generation/{engine_id}/text-to-image",
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        },
+        json={
+            "text_prompts": [
+                {
+                    "text": verse_prompt
+                }
+            ],
+            "cfg_scale": 7,
+            "clip_guidance_preset": "FAST_BLUE",
+            "height": 512,
+            "width": 512,
+            "samples": 1,
+            "steps": 10,
+        },
+    )
 
-data = response.json()
+    if response.status_code != 200:
+        raise Exception("Non-200 response: " + str(response.text))
 
-for i, image in enumerate(data["artifacts"]):
-    with open(f"./out/v1_txt2img_{i}.png", "wb") as f:
-        f.write(base64.b64decode(image["base64"]))
+    data = response.json()
+
+    for i, image in enumerate(data["artifacts"]):
+        # with open(f"./out/v1_txt2img_{i}.png", "wb") as f:
+        with open(f"./out/gen_image.png", "wb") as f:
+            f.write(base64.b64decode(image["base64"]))
 
 
 # ----- Image Editing -----
@@ -237,12 +277,33 @@ output_path = "out/your_image_with_text.png"
 add_text_to_image(image_path, bible_verse, output_path)
 
 
+# ---- Host image on Imgur ----
+
+
+def imgur_upload(client_id, image_path):
+    headers = {
+        'Authorization': 'Client-ID {}'.format(client_id),
+    }
+    url = 'https://api.imgur.com/3/image'
+    with open(image_path, 'rb') as image_file:
+        image_data = image_file.read()
+    response = requests.post(url, headers=headers, data={'image': image_data})
+    if response.status_code == 200:
+        return json.loads(response.text)['data']['link']
+    else:
+        raise Exception('Failed to upload image to Imgur')
+
+
 # ---- Post on Instagram ----
 
-def publish_image():
+def publish_image(image_path, imgur_client_id, insta_token, ig_user_id):
+
+    imgur_client_id = imgur_client_id
+    local_image_path = image_path
+
     access_token = insta_token
-    ig_user_id = '17841458791296115'
-    image_url = 'https://i.swncdn.com/media/1600w/cms/BST/45821-inspirational%20verses.800w.tn.webp'
+    ig_user_id = ig_user_id
+    image_url = imgur_upload(imgur_client_id, local_image_path)
 
     post_url = 'https://graph.facebook.com/v16.0/{}/media'.format(ig_user_id)
     payload = {
@@ -268,8 +329,10 @@ def publish_image():
         r = requests.post(second_url, data=second_payload)
         print(r.text)
         print('Media published to instagram')
+
     else:
         print('Media not published to instagram')
 
 
-publish_image()
+image_path = 'out/your_image_with_text.png'
+publish_image(image_path, imgur_client_id, insta_token, ig_user_id)
