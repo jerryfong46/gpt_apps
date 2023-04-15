@@ -94,7 +94,7 @@ def engagement_score(tweet):
 
 def get_bible_verse_and_keywords(news):
 
-    prompt = f"Given the following news: '{news}' - provide a relevant bible verse that might provide encouragement or comfort or guidance. Explain how the verse relates to the news, provide some background context on the verse, and some words of wisdom."
+    prompt = f"Given the following news: '{news}' - provide either a parable or passage in the Bible that one can draw parallels from. Present the verse, then explain its biblical context, then explain what one can learn from it. Please include a short quote or excerpt (2-3 sentences) from the passage or parable to support your explanation. Keep it to under 200 words."
 
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -111,12 +111,29 @@ def get_bible_verse_and_keywords(news):
     return response.choices[0]['message']['content']
 
 
+# Function to trim the verse if it is too long
+def trim_verse(verse):
+
+    words = verse.split()
+
+    while len(' '.join(words)) > 180:
+        words.pop(0)
+    trimmed_verse = '...' + ' '.join(words)
+
+    return trimmed_verse
+
+
 def get_verse_from_gpt_response(gpt_response):
-    # Regex pattern to match the Bible verse in the text
+    # Regex pattern to match the book and chapter of the Bible verse
     pattern_book = r'(\b[A-Za-z]+\s\d+:\d+\b)'
     match_book = re.findall(pattern_book, gpt_response)
+
+    # Regex pattern to match the verse
     pattern_verse = r'"(.*?)[”|"]'
     match_verse = re.findall(pattern_verse, gpt_response)
+
+    # Trim the verse if it is too long
+    match_verse[0] = trim_verse(match_verse[0])
 
     final_verse = match_verse[0] + ' - ' + match_book[0]
 
@@ -326,26 +343,25 @@ api = tweepy.API(auth)
 
 def main():
     # Download and sort top tweets over past 24 hours,
-    fetch_news('BBCWorld')
+    fetch_news('cnn')  # BBWWorld, CNN, spectatorindex
     top_tweets = pd.read_csv('data/tweet_data.csv')
     twt = top_tweets['text'][0]  # Get top tweet
 
+    twt = 'An in-depth investigation by CityNews has found a sharp rise in concerning behaviours from kids in elementary classrooms in British Columbia, with many primary grade teachers reporting Grade 1 and Grade 2 students being far behind peers in previous years when it comes to social and emotional skills, and higher levels of anxiety and disruptive behaviour in the classrooms, possibly caused by COVID-19 and resulting isolation. Some experts suggest anxiety is the biggest issue, which is supported by some elementary teachers and counsellors who also point to an increase in extreme behaviours disrupting classrooms.'
+
     # Use tweet as prompt to generate Bible verse and caption
     gpt_response = get_bible_verse_and_keywords(twt)  # Get GPT response
-    full_caption = gpt_response + \
-        '\n\n .................... \n\n ' + twt  # Create full caption
+    full_caption = twt + '\n\n - \n\n ' + gpt_response  # Create full caption
 
     # Parse verse from GPT response, append to csv of all generated verses
-    bible_verse = get_verse_from_gpt_response(
-        gpt_response)  # Get verse from GPT response
+    bible_verse = get_verse_from_gpt_response(gpt_response)
 
     with open("data/verse.csv", mode="a", newline="") as file:
         writer = csv.writer(file)
         writer.writerow([bible_verse])
 
     # Generate image from verse
-    verse_prompt = get_image_prompt_from_verse(
-        bible_verse)
+    verse_prompt = get_image_prompt_from_verse(bible_verse)
     gen_image_from_text(verse_prompt)
 
     # Add bible verse to image
@@ -361,31 +377,9 @@ def main():
 
 
 # ----------------
+# Things to do:
+# If verse is too long, add epilises to start of verse
+# Add link to the news article in the caption
+# don't repeat bible verses
 
-
-def get_bible_verse_and_keywords(news):
-    news = twt
-    prompt = f"Given the following news: '{news}' - provide a relevant bible verse that might provide encouragement or comfort or guidance. Explain how the verse relates to the news, provide some background context on the verse, and some words of wisdom."
-
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You are an AI that can provide relevant bible verses and related context based on news."},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=500,
-        n=1,
-        stop=None,
-        temperature=0.5,
-    )
-
-    return response.choices[0]['message']['content']
-
-
-response = openai.ChatCompletion.create(
-    model='gpt-3.5-turbo',
-    messages=[
-          {"role": "user", "content": "Who won the world series in 2020?"}],
-    max_tokens=193,
-    temperature=0,
-)
+bible_verse = 'Still other seed fell on good soil, where it produced a crop—a hundred, sixty or thirty times what was sown. Whoever has ears, let them hear.'
