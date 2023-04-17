@@ -8,7 +8,6 @@ import stability_sdk.interfaces.gooseai.generation.generation_pb2 as generation
 from stability_sdk import client
 
 # Image related imports
-from IPython.display import display
 import io
 from PIL import Image
 
@@ -45,7 +44,7 @@ def fetch_news(news_source):
 
     # Fetch the 5 most recent tweets from the news source
     tweets = api.user_timeline(
-        screen_name=news_source, count=200, tweet_mode="extended")
+        screen_name=news_source, count=300, tweet_mode="extended")
 
     # Extract relevant information from the tweets
     tweet_data = []
@@ -94,7 +93,7 @@ def engagement_score(tweet):
 
 def get_bible_verse_and_keywords(news):
 
-    prompt = f"Given the following news: '{news}' - provide either a parable or passage in the Bible that one can draw parallels from. Present the verse, then explain its biblical context, then explain what one can learn from it. Please include a short quote or excerpt (2-3 sentences) from the passage or parable to support your explanation. Keep it to under 200 words."
+    prompt = f"Given the following news: '{news}' - Provide either a parable or passage in the Bible that one can draw parallels or provide hope or guidance. Explain the biblical context of the verse in 2-3 sentences, how it relates to the situation, what we can learn from it. Please include a short quote or excerpt (2-3 sentences) from the passage or parable to support your explanation. Present in way to maximize engagement on Instagram, such as emojis, line breaks, and relevant hashtags at the end of the caption. Keep it to under 250 words."
 
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -177,7 +176,7 @@ def gen_image_from_text(verse_prompt):
         json={
             "text_prompts": [
                 {
-                    "text": verse_prompt + ', sci-fi movie style, overcast, night sky, motion blur, blur, volumetric dynamic lighting, atmospheric lighting'
+                    "text": verse_prompt + ', sci-fi movie style, overcast, night sky, motion blur, blur, atmospheric lighting'
                 }
             ],
             "cfg_scale": 7,
@@ -343,11 +342,11 @@ api = tweepy.API(auth)
 
 def main():
     # Download and sort top tweets over past 24 hours,
-    fetch_news('cnn')  # BBWWorld, CNN, spectatorindex
+    fetch_news('BBWWorld')  # BBWWorld, CNN, spectatorindex
     top_tweets = pd.read_csv('data/tweet_data.csv')
     twt = top_tweets['text'][0]  # Get top tweet
 
-    twt = 'An in-depth investigation by CityNews has found a sharp rise in concerning behaviours from kids in elementary classrooms in British Columbia, with many primary grade teachers reporting Grade 1 and Grade 2 students being far behind peers in previous years when it comes to social and emotional skills, and higher levels of anxiety and disruptive behaviour in the classrooms, possibly caused by COVID-19 and resulting isolation. Some experts suggest anxiety is the biggest issue, which is supported by some elementary teachers and counsellors who also point to an increase in extreme behaviours disrupting classrooms.'
+    twt = "Ontario is proposing new rules to ban celebrities who might appeal to children from appearing in gambling ads after hockey and Hollywood stars, including Wayne Gretzky and Jamie Foxx, have all appeared in commercials since the legalization of online betting. Online gambling generated $1.4 billion in gaming revenue in Ontario's first year of regulation."
 
     # Use tweet as prompt to generate Bible verse and caption
     gpt_response = get_bible_verse_and_keywords(twt)  # Get GPT response
