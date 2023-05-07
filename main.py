@@ -93,7 +93,7 @@ def engagement_score(tweet):
 
 def get_bible_verse_and_keywords(news):
 
-    prompt = f"Given the following news: '{news}' - Provide either a parable or passage in the Bible that one can draw parallels or provide hope or guidance. Explain the biblical context of the verse in 2-3 sentences, how it relates to the situation, what we can learn from it. Please include a short quote or excerpt (2-3 sentences) from the passage or parable to support your explanation. Present in way to maximize engagement on Instagram, such as emojis, line breaks, and relevant hashtags at the end of the caption. Keep it to under 250 words."
+    prompt = f"Given the following news: '{news}' - Provide EITHER a Bible verse or Bible parable that can provide hope or guidance. Explain the historical biblical background in 2-3 sentences, how it relates to the situation, and what we can learn from it. Please include a short quote or excerpt (2-3 sentences) from the verse or parable within the answer. Present in way to maximize engagement on Instagram, such line breaks, and relevant hashtags (only at end). Start each paragraph with a relevant emoji. Keep it under 250 words."
 
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
@@ -104,7 +104,7 @@ def get_bible_verse_and_keywords(news):
         max_tokens=500,
         n=1,
         stop=None,
-        temperature=0.5,
+        temperature=0.7,
     )
 
     return response.choices[0]['message']['content']
@@ -114,10 +114,16 @@ def get_bible_verse_and_keywords(news):
 def trim_verse(verse):
 
     words = verse.split()
+    trimmed = False
 
     while len(' '.join(words)) > 180:
         words.pop(0)
-    trimmed_verse = '...' + ' '.join(words)
+        trimmed = True
+
+    if trimmed:
+        trimmed_verse = '...' + ' '.join(words)
+    else:
+        trimmed_verse = verse
 
     return trimmed_verse
 
@@ -342,11 +348,11 @@ api = tweepy.API(auth)
 
 def main():
     # Download and sort top tweets over past 24 hours,
-    fetch_news('BBWWorld')  # BBWWorld, CNN, spectatorindex
+    fetch_news('BBCWorld')  # BBCWorld, CNN, spectatorindex
     top_tweets = pd.read_csv('data/tweet_data.csv')
     twt = top_tweets['text'][0]  # Get top tweet
 
-    twt = "Ontario is proposing new rules to ban celebrities who might appeal to children from appearing in gambling ads after hockey and Hollywood stars, including Wayne Gretzky and Jamie Foxx, have all appeared in commercials since the legalization of online betting. Online gambling generated $1.4 billion in gaming revenue in Ontario's first year of regulation."
+    twt = "The rapid advancements in AI, like ChatGPT, are increasingly threatening white-collar jobs, forcing individuals to find new ways to define self-worth beyond their careers. As higher-paid and creative jobs become more exposed to automation, the AI revolution will uniquely impact white-collar workers. Adapting to this new reality may involve focusing on skills and roles less susceptible to automation and seeking fulfillment in other aspects of life, such as relationships, hobbies, and personal growth."
 
     # Use tweet as prompt to generate Bible verse and caption
     gpt_response = get_bible_verse_and_keywords(twt)  # Get GPT response
@@ -380,5 +386,3 @@ def main():
 # If verse is too long, add epilises to start of verse
 # Add link to the news article in the caption
 # don't repeat bible verses
-
-bible_verse = 'Still other seed fell on good soil, where it produced a crop—a hundred, sixty or thirty times what was sown. Whoever has ears, let them hear.'
