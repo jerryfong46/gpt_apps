@@ -346,6 +346,51 @@ auth.set_access_token(access_token, access_token_secret)
 api = tweepy.API(auth)
 
 
+
+
+
+
+def get_gpt_response(prompt):
+
+    prompt = prompt
+
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are the social media account manager for an Instagram account that creates Biblical related posts. "},
+            {"role": "user", "content": prompt},
+        ],
+        max_tokens=500,
+        n=1,
+        stop=None,
+        temperature=0.5,
+    )
+
+    return response.choices[0]['message']['content']
+
+prompt = """
+Please select a quote from a book or sermon from one of the following pastors/authors: Timothy J Keller, Lee Strobel, 
+Rick Warren, John Piper, David Platt, C.S. Lewis, A.W. Tozer, J.I. Packer, Francis Chan, Todd Burpo, Dane C. Ortlund, 
+Jeff Vanderstelt. The quote should provide hope, guidance, inspiration, encouragement, or wisdom.
+
+Please provide some text that can be utilized as the caption for an Instagram post. In the text, include the quote, author, source, context within the book/sermon, and how one can apply it in their lives/what one can learn from it. Present it in a way is engaging on social media. At the end of the text, include relevant hashtags that will maximize engagement. Keep it under 250 words. Keep the number of emojis used under 4 and a maximum of 1 emoji in a paragraph.
+"""
+
+caption = get_gpt_response(prompt)
+
+prompt = f"present the key message from {caption} in 10 words of less. maximize for engagement on social media. it will be used to overlay ontop of a picture on instagram. don't include hashtags. it should be able to capture the audience's attention"
+
+text = get_gpt_response(prompt)
+
+prompt = f"Provide 5-10 words separated by commas that will generated a photo to depict the following passage: {caption}"
+verse_prompt = get_gpt_response(prompt)
+verse_prompt
+
+
+
+
+
+
 def main():
     # Download and sort top tweets over past 24 hours,
     fetch_news('BBCWorld')  # BBCWorld, CNN, spectatorindex
