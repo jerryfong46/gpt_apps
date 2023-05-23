@@ -212,6 +212,11 @@ def gen_image_from_text(verse_prompt):
             f.write(base64.b64decode(image["base64"]))
 
 
+# ----- DALL-E -----
+
+response = openai.Image.create(prompt="a white siamese cat", n=1, size="1024x1024")
+image_url = response["data"][0]["url"]
+
 # ----- Image Editing -----
 
 
@@ -446,11 +451,11 @@ Please provide some text that can be utilized as the caption for an Instagram po
 
 caption = get_gpt_response(prompt)
 
-prompt = f"present the key message from {caption} in 20 words of less. maximize for engagement on social media. it will be used to overlay ontop of a picture on instagram. Don't include hashtags or emojis. it should be able to capture the audience's attention"
+prompt = f"You are a social media expert. Present the key message from {caption} in 20 words of less. maximize for engagement on social media. it will be used to overlay ontop of a picture on instagram. Don't include hashtags or emojis. it should be able to capture the audience's attention"
 
 text = get_gpt_response(prompt)
 
-prompt = f"Provide 5-10 words separated by commas that will generated a photo to depict the following passage: {caption}"
+prompt = f"You are a prompt engineering expert. Create a metaphorical image description based on the themes : {caption}"
 verse_prompt = get_gpt_response(prompt)
 verse_prompt
 
