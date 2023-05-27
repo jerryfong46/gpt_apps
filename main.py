@@ -214,8 +214,26 @@ def gen_image_from_text(verse_prompt):
 
 # ----- DALL-E -----
 
-response = openai.Image.create(prompt="a white siamese cat", n=1, size="1024x1024")
-image_url = response["data"][0]["url"]
+
+def gen_image_from_text(verse_prompt):
+    response = openai.Image.create(prompt=verse_prompt, n=1, size="1024x1024")
+    image_url = response["data"][0]["url"]
+
+    import requests
+
+    # Send a HTTP request to the URL of the image
+    response = requests.get(image_url)
+
+    # Check that the request was successful
+    if response.status_code == 200:
+        # Open the url image, set stream to True, this will return the stream content
+        response = requests.get(image_url, stream=True)
+
+        # Open a local file with write-binary mode and write the image to the file
+        with open("./out/gen_image.png", "wb") as out_file:
+            out_file.write(response.content)
+        del response
+
 
 # ----- Image Editing -----
 
@@ -262,6 +280,13 @@ def add_text_to_image(image_path, text, output_path):
         draw.rectangle(
             [x - 5, y, x + text_width + 5, y + font_size], fill=rectangle_fill
         )
+
+        # Draw the text with shadow
+        shadowcolor = "gray"
+        draw.text((x - 1, y - 1), line, font=font, fill=shadowcolor)
+        draw.text((x + 1, y - 1), line, font=font, fill=shadowcolor)
+        draw.text((x - 1, y + 1), line, font=font, fill=shadowcolor)
+        draw.text((x + 1, y + 1), line, font=font, fill=shadowcolor)
 
         # Draw the text
         draw.text((x, y), line, font=font, fill=(0, 0, 0))  # Black text
@@ -354,11 +379,11 @@ auth.set_access_token(access_token, access_token_secret)
 api = tweepy.API(auth)
 
 
-def get_gpt_response(prompt):
+def get_gpt_response(prompt, model):
     prompt = prompt
 
     response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
+        model=model,
         messages=[
             {
                 "role": "system",
@@ -436,7 +461,7 @@ pastors_ls = [
     "Jeff Vanderstelt",
 ]
 
-medium_ls = ["book", "sermon"]
+medium_ls = ["book", "book", "book", "sermon"]
 
 sel_experience = random.choice(human_experience)
 sel_pastor = random.choice(pastors_ls)
@@ -444,20 +469,33 @@ sel_medium = random.choice(medium_ls)
 
 prompt = f"""
 You want to connect with the audience who might be experiencing: {sel_experience}.
-Please select a quote from a {sel_medium} from one of the following pastors/authors: {sel_pastor}. The quote should provide hope, guidance, inspiration, encouragement, or wisdom.
+Please select a quote from a {sel_medium} from the following pastor/author: {sel_pastor}. The quote should provide hope, guidance, inspiration, encouragement, or wisdom.
 
-Please provide some text that can be utilized as the caption for an Instagram post. In the text, include the quote, author, source, context within the book/sermon, and how one can apply it in their lives/what one can learn from it. Present it in a way is engaging on social media. At the end of the text, include relevant hashtags that will maximize engagement. Keep it under 250 words. Keep the number of emojis used under 4 and a maximum of 1 emoji in a paragraph.
+Please provide some text that can be utilized as the caption for an Instagram post. In the text, include the quote, author, source, context within the {sel_medium}, and how one can apply it in their lives/what one can learn from it. Present it in a way is engaging on social media. At the end of the text, include relevant hashtags that will maximize engagement. Keep it under 250 words. Keep the number of emojis used under 4 and a maximum of 1 emoji in a paragraph.
 """
 
-caption = get_gpt_response(prompt)
+caption = get_gpt_response(prompt, "gpt-4")
 
-prompt = f"You are a social media expert. Present the key message from {caption} in 20 words of less. maximize for engagement on social media. it will be used to overlay ontop of a picture on instagram. Don't include hashtags or emojis. it should be able to capture the audience's attention"
+prompt = f"You are a social media expert. Present the key message from {caption} in 20 words of less. It should be concise enough to capture the audience's attention. it will be used to overlay ontop of a picture on instagram. it should be able to capture the audience's attention. Don't include hashtags or emojis."
+text = get_gpt_response(prompt, "gpt-4")
+text
 
-text = get_gpt_response(prompt)
-
-prompt = f"You are a prompt engineering expert. Create a metaphorical image description based on the themes : {caption}"
-verse_prompt = get_gpt_response(prompt)
+prompt = f"You are a prompt engineering expert. Create a short metaphorical image description based on the themes : {text} The image description should be a maximum of 1 or 2 sentences and will be used by Dall-E to generate an image."
+verse_prompt = get_gpt_response(prompt, "gpt-4")
 verse_prompt
+
+effects = (
+    ", sci-fi movie style, overcast, night sky, motion blur, blur, atmospheric lighting"
+)
+gen_image_from_text(verse_prompt + effects)
+# Add bible verse to image
+image_path = "out/gen_image.png"
+output_path = "out/gen_image_with_text.png"
+add_text_to_image(image_path, text, output_path)
+
+# Upload image with text from local to Imgur, then post to Insta
+image_path = "out/gen_image_with_text.png"
+publish_image(image_path, caption, imgur_client_id, insta_token, ig_user_id)
 
 
 def main():
@@ -499,3 +537,105 @@ def main():
 # If verse is too long, add epilises to start of verse
 # Add link to the news article in the caption
 # don't repeat bible verses
+
+
+
+
+
+
+class NewsRetriever:
+    def __init__(self, twitter_api):
+        # initialize with necessary API keys or client
+        self.api = twitter_api
+
+    def get_top_news(self):
+        # implement logic to fetch and return top news
+
+
+class ExperiencePicker:
+    def __init__(self, experiences, authors):
+        self.experiences = experiences
+        self.authors = authors
+
+    def pick_experience_and_author(self):
+        # implement logic to pick and return a random experience and author
+
+
+class ContentGenerator:
+    def __init__(self, openai_api):
+        # initialize with necessary API keys or client
+        self.api = openai_api
+
+    def generate_caption(self, prompt):
+        # implement logic to generate and return a caption based on the prompt
+
+
+class ImageManager:
+    def __init__(self, openai_api):
+        # initialize with necessary API keys or client
+        self.api = openai_api
+
+    def generate_image(self, verse_prompt):
+        # implement logic to generate an image based on the verse_prompt
+
+    def add_text_to_image(self, image_path, text):
+        # implement logic to add text to an image
+
+
+class PostPublisher:
+    def __init__(self, imgur_client_id, insta_token, ig_user_id):
+        # initialize with necessary parameters
+        self.imgur_client_id = imgur_client_id
+        self.insta_token = insta_token
+        self.ig_user_id = ig_user_id
+
+    def publish_image(self, image_path, caption):
+        # implement logic to publish an image with caption on Instagram
+
+
+class SocialMediaManager:
+    def __init__(self, twitter_api, openai_api, imgur_client_id, insta_token, ig_user_id, experiences, authors):
+        self.news_retriever = NewsRetriever(twitter_api)
+        self.experience_picker = ExperiencePicker(experiences, authors)
+        self.content_generator = ContentGenerator(openai_api)
+        self.image_manager = ImageManager(openai_api)
+        self.post_publisher = PostPublisher(imgur_client_id, insta_token, ig_user_id)
+
+    def create_news_post(self):
+        # 1. Get top news
+        # 2. Generate caption
+        # 3. Generate image
+
+class NewsBasedPost:
+    def __init__(self):
+        self.news_retriever = NewsRetriever()
+        self.verse_finder = VerseFinder()
+        self.image_generator = ImageGenerator()
+        self.content_creator = ContentCreator()
+        self.post_creator = InstagramPostCreator()
+
+    def create_post(self):
+        news = self.news_retriever.get_top_news()
+        verse = self.verse_finder.find_related_verse(news)
+        image = self.image_generator.generate_image(news, verse)
+        content = self.content_creator.create_content(news, verse)
+        self.post_creator.create_post(image, content)
+
+
+class ExperienceBasedPost:
+    def __init__(self):
+        self.experience_picker = ExperiencePicker()
+        self.author_picker = AuthorPicker()
+        self.book_picker = BookPicker()
+        self.image_generator = ImageGenerator()
+        self.content_creator = ContentCreator()
+        self.post_creator = InstagramPostCreator()
+
+    def create_post(self):
+        experience = self.experience_picker.pick_random_experience()
+        author = self.author_picker.pick_random_author()
+        book = self.book_picker.pick_book(author)
+        image = self.image_generator.generate_image(experience, author, book)
+        content = self.content_creator.create_content(experience, author, book)
+        self.post_creator.create_post(image, content)
+
